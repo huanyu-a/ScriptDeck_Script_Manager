@@ -20,6 +20,9 @@ Thumbs.db
 # WorkBuddy
 .workbuddy/
 
+# CodeBuddy
+.codebuddy/
+
 # Backups
 *.bak
 
