@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="../static/logo.png">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <title>ScriptDeck_脚本中台</title>
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <img src="../static/logo.png" alt="ScriptDeck Logo" class="brand-logo">
+            <div>
+              <div class="brand-title">ScriptDeck</div>
+              <div class="brand-subtitle">脚本中台</div>
+            </div>
+          </div>
+
+          <label class="command-search" for="searchInput">
+            <span class="search-icon">⌘</span>
+            <input id="searchInput" type="search" placeholder="搜索脚本…">
+          </label>
+        </div>
+
+        <nav class="nav-tabs" aria-label="快捷筛选">
+          <button class="nav-tab active" type="button" data-mode="all">
+            全部<b id="countAll">0</b>
+          </button>
+          <button class="nav-tab" type="button" data-mode="favorites">
+            收藏<b id="countFavorites">0</b>
+          </button>
+          <button class="nav-tab" type="button" data-mode="recent">
+            最近<b id="countRecent">0</b>
+          </button>
+        </nav>
+
+        <div class="sidebar-title">目录树</div>
+        <div class="tree" id="sidebarTree"></div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <h1>更快找到脚本，更舒服地启动任务</h1>
+          <p>自动扫描 bat 和 README，支持收藏、最近运行、目录筛选与详情预览</p>
+        </section>
+
+        <section class="content-toolbar">
+          <div>
+            <h2 id="viewTitle">全部脚本</h2>
+            <p id="viewSubtitle">正在扫描目录…</p>
+          </div>
+          <div class="segmented" role="group" aria-label="视图切换">
+            <button class="active" id="gridViewBtn" type="button">卡片</button>
+            <button id="listViewBtn" type="button">列表</button>
+          </div>
+        </section>
+
+        <section id="main" class="script-board">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>正在扫描目录…</span>
+          </div>
+        </section>
+        <button class="rocket-btn" id="rocketBtn" type="button" title="回到顶部">🚀</button>
+      </main>
+
+      <aside class="detail-panel" id="detailPanel" aria-label="脚本详情">
+        <div class="detail-actions-row">
+          <button class="ghost-button" id="themeBtn" type="button" title="切换主题">☾</button>
+          <button class="ghost-button" id="refreshBtn" type="button">刷新</button>
+          <button class="primary-button" id="settingsBtn" type="button">设置目录</button>
+        </div>
+        <div class="detail-metrics">
+          <div class="metric-item">
+            <span>目录</span>
+            <strong id="metricDirs">0</strong>
+          </div>
+          <div class="metric-item">
+            <span>脚本</span>
+            <strong id="metricScripts">0</strong>
+          </div>
+          <div class="metric-item">
+            <span>文档</span>
+            <strong id="metricReadmes">0</strong>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-empty">
+            <div class="empty-orb">✦</div>
+            <h3>选择一个脚本</h3>
+            <p>这里会展示路径、README 摘要和快捷操作。</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="settingsModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">扫描设置</span>
+          <h3 id="settingsTitle">设置脚本根目录</h3>
+        </div>
+        <button class="icon-button" id="closeSettingsBtn" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="modal-copy">程序会扫描该目录下的子文件夹，收集 <b>.bat</b> 与 README 文件。</p>
+      <div class="path-input-row">
+        <input id="rootInput" type="text" placeholder="例如：C:\project">
+        <button class="primary-button" id="setRootBtn" type="button">应用</button>
+      </div>
+
+      <div class="exclude-bats-section">
+        <label class="exclude-bats-label">
+          <span class="eyebrow">排除规则</span>
+          <strong>过滤 bat 文件名</strong>
+        </label>
+        <p class="modal-copy modal-copy-sm">文件名匹配以下任一模式时将被忽略。支持通配符 <code>*</code> 和 <code>?</code>，例如 <code>start_*</code>、<code>*.tmp.bat</code>。</p>
+        <div class="exclude-bats-list" id="excludeBatsList"></div>
+        <div class="path-input-row" style="margin-top:8px">
+          <input id="excludeBatInput" type="text" placeholder="输入模式，如 start_*">
+          <button class="ghost-button" id="addExcludeBatBtn" type="button">添加</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

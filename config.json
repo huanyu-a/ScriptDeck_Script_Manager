@@ -1,0 +1,31 @@
+{
+  "scan_root": "C:\\project",
+  "exclude_dirs": [
+    "node_modules",
+    ".git",
+    "__pycache__",
+    "venv",
+    ".idea",
+    "dabao",
+    "tool",
+    "备份",
+    "bak",
+    "src",
+    "skill",
+    "ceshi",
+    "config",
+    "neirong",
+    "wwwroot"
+  ],
+  "exclude_bats": [
+    "副本",
+    "start_*",
+    "start-*"
+  ],
+  "exclude_scripts": [
+    "C:\\project\\ai\\bacth_ai\\start-aiohttp_chat_batch.bat",
+    "C:\\project\\aizhan\\aizhan_mulu\\clash.meta.bat"
+  ],
+  "host": "127.0.0.1",
+  "port": 5000
+}

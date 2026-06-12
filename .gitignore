@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# WorkBuddy
+.workbuddy/
+
+# Backups
+*.bak
+
+# Screenshots (项目截图保留在 static/screenshots/)
+# 个人截图不提交
+temp/
+screenshots/
+!static/screenshots/
