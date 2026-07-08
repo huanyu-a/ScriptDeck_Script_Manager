@@ -488,21 +488,29 @@ function flattenScripts(items) {
     const readmeText = item.readme?.content || "";
     const readmeSummary = summarizeReadme(readmeText);
     const readmeTitle = extractReadmeTitle(readmeText);
-    return (item.bats || []).map((batFile) => ({
-      id: batFile.path,
-      name: batFile.name,
-      title: readmeTitle || batFile.name.replace(/\.bat$/i, ""),
-      path: batFile.path,
-      folder: item.folder,
-      folderName: item.folder_name,
-      parent: item.parent,
-      folderPath: getFolderPath(batFile.path),
-      readmeName: item.readme?.name || "",
-      readmeText,
-      readmeSummary,
-      color: colorFor(`${item.folder}/${batFile.name}`),
-      icon: iconFor(`${item.folder} ${batFile.name} ${readmeText}`),
-    }));
+    return (item.scripts || []).map((scriptFile) => {
+      const batMeta = scriptFile.meta || {};
+      // 优先级：脚本内嵌标题 > readme 标题 > 文件名（去掉 .bat / .vbs 后缀）
+      const title = batMeta.title || readmeTitle || scriptFile.name.replace(/\.(bat|vbs)$/i, "");
+      // 优先级：脚本内嵌描述 > readme 摘要
+      const summary = batMeta.desc || readmeSummary;
+      return {
+        id: scriptFile.path,
+        name: scriptFile.name,
+        title,
+        path: scriptFile.path,
+        folder: item.folder,
+        folderName: item.folder_name,
+        parent: item.parent,
+        folderPath: getFolderPath(scriptFile.path),
+        readmeName: item.readme?.name || "",
+        readmeText,
+        readmeSummary: summary,
+        color: colorFor(`${item.folder}/${scriptFile.name}`),
+        icon: iconFor(`${item.folder} ${scriptFile.name} ${readmeText}`),
+        type: scriptFile.type || "bat",
+      };
+    });
   });
 }
 
@@ -607,7 +615,7 @@ function renderScriptCard(script) {
       <p class="script-desc">${escapeHtml(script.readmeSummary || "暂无 README 摘要。选中后可查看路径与快捷操作。")}</p>
       <div class="script-actions">
         <div class="badge-row">
-          <span class="badge">BAT</span>
+          <span class="badge ${script.type === "vbs" ? "vbs" : ""}">${script.type === "vbs" ? "VBS" : "BAT"}</span>
           ${script.readmeText ? `<span class="badge readme">README</span>` : ""}
         </div>
         <div class="script-actions">
@@ -748,13 +756,13 @@ function buildTree() {
   appState.items.forEach((item) => {
     const parts = item.folder.split("/");
     let currentNode = root;
-    currentNode.count += item.bats?.length || 0;
+    currentNode.count += item.scripts?.length || 0;
     parts.forEach((part) => {
       if (!currentNode.children[part]) {
         currentNode.children[part] = { name: part, children: {}, count: 0 };
       }
       currentNode = currentNode.children[part];
-      currentNode.count += item.bats?.length || 0;
+      currentNode.count += item.scripts?.length || 0;
     });
   });
   return root;

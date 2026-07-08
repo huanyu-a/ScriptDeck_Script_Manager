@@ -50,17 +50,144 @@ def bat_excluded(name: str, exclude_bats: list) -> bool:
             return True
     return False
 
+PREFIXES = ("::", "REM", "rem")
+
+# Windows 常见编码，按优先级排列
+BAT_ENCODINGS = ["utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"]
+
+def _read_file_with_encoding(filepath: str, max_lines: int = 10):
+    """尝试多种编码读取文件前 N 行，返回 (lines_list, used_encoding)。"""
+    raw_bytes = b""
+    try:
+        with open(filepath, "rb") as f:
+            for _ in range(max_lines):
+                line = f.readline()
+                if not line:
+                    break
+                raw_bytes += line
+    except Exception:
+        return [], ""
+
+    # 按优先级尝试解码
+    for enc in BAT_ENCODINGS:
+        try:
+            text = raw_bytes.decode(enc)
+            lines = [line.rstrip("\r\n") for line in text.split("\n")]
+            return lines, enc
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+
+    # 最终回退：用 errors='replace'
+    text = raw_bytes.decode("utf-8", errors="replace")
+    return [line.rstrip("\r\n") for line in text.split("\n")], "utf-8-fallback"
+
+def parse_bat_metadata(bat_path: str) -> dict:
+    """
+    解析 bat 文件头部的内嵌元数据。
+
+    支持的元数据格式：
+      @echo off
+      :: title: 脚本标题
+      :: desc: 脚本描述
+
+    或：
+      @echo off
+      REM title: 脚本标题
+      REM desc: 脚本描述
+
+    :: 和 REM 两种注释风格均可被识别，且可混合使用。
+
+    规则：
+      - 第一行必须以 @echo 开头
+      - 从第二行开始匹配连续的注释行（以 :: 或 REM 开头）
+      - 遇到非注释行就停止
+      - 返回 {"title": "...", "desc": "..."}，未匹配到则返回空字符串
+    """
+    meta = {"title": "", "desc": ""}
+    lines, _ = _read_file_with_encoding(bat_path, max_lines=10)
+
+    if not lines:
+        return meta
+
+    # 第一行必须以 @echo 开头
+    first_line = lines[0].strip().lower()
+    if not first_line.startswith("@echo"):
+        return meta
+
+    # 从第二行开始解析连续的注释块
+    for line in lines[1:]:
+        stripped = line.strip()
+        detected_prefix = None
+        for p in PREFIXES:
+            if stripped.startswith(p):
+                detected_prefix = p
+                break
+        if detected_prefix is None:
+            break  # 遇到非注释行，停止解析
+
+        content = stripped[len(detected_prefix):].strip()  # 去掉 :: 或 REM 前缀
+        if ":" in content:
+            key, _, value = content.partition(":")
+            key = key.strip().lower()
+            value = value.strip()
+            if key == "title" and value:
+                meta["title"] = value
+            elif key == "desc" and value:
+                meta["desc"] = value
+
+    return meta
+
+
+def parse_vbs_metadata(vbs_path: str) -> dict:
+    """
+    解析 vbs 文件头部的内嵌元数据。
+
+    支持的元数据格式（VBS 使用单引号注释）：
+      ' title: 脚本标题
+      ' desc: 脚本描述
+
+    规则：
+      - 从第一行开始匹配连续的注释行（以 ' 开头）
+      - 遇到非注释行就停止
+      - 返回 {"title": "...", "desc": "..."}，未匹配到则返回空字符串
+    """
+    meta = {"title": "", "desc": ""}
+    lines, _ = _read_file_with_encoding(vbs_path, max_lines=10)
+
+    if not lines:
+        return meta
+
+    # 从第一行开始解析连续的注释块
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("'"):
+            break  # 遇到非注释行，停止解析
+
+        content = stripped[1:].strip()  # 去掉 ' 前缀
+        if ":" in content:
+            key, _, value = content.partition(":")
+            key = key.strip().lower()
+            value = value.strip()
+            if key == "title" and value:
+                meta["title"] = value
+            elif key == "desc" and value:
+                meta["desc"] = value
+
+    return meta
+
+
 def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None, exclude_scripts: list = None):
     """
-    扫描 scan_root 下的子文件夹，收集 .bat 文件和 readme 文件。
+    扫描 scan_root 下的子文件夹，收集 .bat / .vbs 文件和 readme 文件。
     exclude_scripts: 按完整路径排除的脚本列表。
+    当同一目录同时存在 .vbs 和 .bat 时，只保留 .vbs（VBS 优先）。
     返回按文件夹分组的数据结构：
     [
       {
         "folder": "ai\\bacth_ai",
         "folder_name": "bacth_ai",
         "parent": "ai",
-        "bats": [{"name": "xxx.bat", "path": "C:\\...\\xxx.bat"}],
+        "scripts": [{"name": "xxx.bat", "path": "C:\\...\\xxx.bat", "type": "bat", "meta": {"title": "...", "desc": "..."}}],
         "readme": {"name": "readme.md", "path": "...", "content": "..."}
       }
     ]
@@ -82,30 +209,54 @@ def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None
             continue
 
         bats = []
+        vbs_scripts = []
         readme = None
 
         for fname in filenames:
             full = os.path.join(dirpath, fname)
-            if fname.lower().endswith(".bat"):
+            lower_name = fname.lower()
+            if lower_name.endswith(".bat"):
                 norm_full = os.path.normpath(full).lower()
                 if norm_full in exclude_script_set:
                     continue
                 if not bat_excluded(fname, exclude_bats or []):
-                    bats.append({"name": fname, "path": full})
+                    meta = parse_bat_metadata(full)
+                    bats.append({"name": fname, "path": full, "meta": meta, "type": "bat"})
+            elif lower_name.endswith(".vbs"):
+                norm_full = os.path.normpath(full).lower()
+                if norm_full in exclude_script_set:
+                    continue
+                if not bat_excluded(fname, exclude_bats or []):
+                    meta = parse_vbs_metadata(full)
+                    vbs_scripts.append({"name": fname, "path": full, "meta": meta, "type": "vbs"})
             elif is_readme(fname):
                 try:
-                    content = Path(full).read_text(encoding="utf-8", errors="ignore")[:3000]
+                    # 尝试多种编码读取 readme，避免中文乱码
+                    raw = Path(full).read_bytes()
+                    content_text = None
+                    for enc in BAT_ENCODINGS:
+                        try:
+                            content_text = raw[:30000].decode(enc)
+                            break
+                        except (UnicodeDecodeError, UnicodeError):
+                            continue
+                    if content_text is None:
+                        content_text = raw[:30000].decode("utf-8", errors="replace")
+                    content = content_text[:3000]
                 except Exception:
                     content = "(无法读取)"
                 readme = {"name": fname, "path": full, "content": content}
 
-        if bats or readme:
+        # VBS 优先：同目录同时存在 .vbs 和 .bat 时，只保留 .vbs
+        scripts = vbs_scripts if vbs_scripts else bats
+
+        if scripts or readme:
             parts = Path(rel).parts
             results.append({
                 "folder": rel.replace("\\", "/"),
                 "folder_name": parts[-1],
                 "parent": parts[0] if len(parts) > 1 else "",
-                "bats": bats,
+                "scripts": scripts,
                 "readme": readme,
             })
 
@@ -186,19 +337,24 @@ def api_exclude_script():
 
 @app.route("/api/run-bat", methods=["POST"])
 def api_run_bat():
-    """在新窗口中运行 bat 文件"""
+    """运行脚本文件（.bat 或 .vbs）"""
     body = request.json or {}
-    bat_path = body.get("path", "").strip()
-    if not bat_path or not os.path.isfile(bat_path):
-        return jsonify({"ok": False, "msg": f"文件不存在：{bat_path}"}), 400
+    script_path = body.get("path", "").strip()
+    if not script_path or not os.path.isfile(script_path):
+        return jsonify({"ok": False, "msg": f"文件不存在：{script_path}"}), 400
+    basename = os.path.basename(script_path)
     try:
-        bat_dir = os.path.dirname(bat_path)
-        # chcp 65001 将 cmd 切换到 UTF-8 编码，避免 bat 中的中文路径乱码
-        subprocess.Popen(
-            f'start "Running: {os.path.basename(bat_path)}" cmd /k "chcp 65001 >nul && "{bat_path}""',
-            shell=True, cwd=bat_dir
-        )
-        return jsonify({"ok": True, "msg": f"已启动：{os.path.basename(bat_path)}"})
+        script_dir = os.path.dirname(script_path)
+        if script_path.lower().endswith(".vbs"):
+            # VBS 通过 wscript.exe 执行，脚本自身控制窗口（如隐藏 GUI）
+            subprocess.Popen(f'wscript.exe "{script_path}"', shell=True, cwd=script_dir)
+        else:
+            # chcp 65001 将 cmd 切换到 UTF-8 编码，避免 bat 中的中文路径乱码
+            subprocess.Popen(
+                f'start "Running: {basename}" cmd /k "chcp 65001 >nul && "{script_path}""',
+                shell=True, cwd=script_dir
+            )
+        return jsonify({"ok": True, "msg": f"已启动：{basename}"})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
 

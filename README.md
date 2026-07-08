@@ -1,6 +1,6 @@
 # ScriptDeck（脚本中台）
 
-> 给你的 Python 脚本一个家 —— 自动扫描目录中的 `.bat` 和 README 文档，在漂亮的浏览器界面中一键查找、预览、启动。不只 Python，任何能用 .bat 跑起来的项目都行。
+> 给你的 Python 脚本一个家 —— 自动扫描目录中的 `.bat` / `.vbs` 和 README 文档，在漂亮的浏览器界面中一键查找、预览、启动。不只 Python，任何能用 .bat / .vbs 跑起来的项目都行。
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
@@ -10,9 +10,11 @@
 
 ## 💡 工作原理
 
-ScriptDeck 不关心你的脚本是什么语言。它只看一件事：**你指定的目录下，哪些子目录同时有 `.bat` 文件和 `readme.md` 文件。**
+ScriptDeck 不关心你的脚本是什么语言。它只看一件事：**你指定的目录下，哪些子目录同时有脚本文件（`.bat` 或 `.vbs`）和 `readme.md` 文件。**
 
-找到后，自动整理成卡片界面 —— bat 负责启动，readme 负责说明。点一下"运行"，脚本就在新窗口中跑起来了。
+找到后，自动整理成卡片界面 —— 脚本文件负责启动，readme 负责说明。点一下"运行"，脚本就在新窗口中跑起来了。
+
+> 💡 **VBS 优先**：当同一目录同时存在 `.vbs` 和 `.bat` 时，只提取 `.vbs` 文件。
 
 ### 接入一个新脚本，只需三步
 
@@ -32,6 +34,16 @@ C:\Users\WIN11\.workbuddy\binaries\python\versions\3.13.12\python.exe C:\project
 
 > ⚠️ **注意**：多 Python 环境下，bat 文件里**必须用绝对路径**指定 Python 解释器，避免跑到系统默认版本。
 
+你也可以用 `.vbs` 来启动（适合需要隐藏命令窗口、只显示 GUI 的场景），比如 `run.vbs`：
+
+```vbs
+' title: 时间戳生成工具
+' desc: 根据开始日期+天数自动计算结束日期，批量生成 UNIX 时间戳
+Set shell = CreateObject("WScript.Shell")
+scriptPath = Left(WScript.ScriptFullName, InStrRev(WScript.ScriptFullName, "\") - 1)
+shell.Run """C:/path/to/pythonw.exe"" -u """ & scriptPath & "\main.py""", 0, False
+```
+
 `readme.md` 长这样：
 
 ```md
@@ -39,7 +51,7 @@ C:\Users\WIN11\.workbuddy\binaries\python\versions\3.13.12\python.exe C:\project
 读取 Excel 数据并生成周报图表
 ```
 
-ScriptDeck 会把第一行作为卡片标题，第二行作为描述摘要。后面的内容会完整渲染在详情面板里。
+ScriptDeck 会把第一行作为卡片标题、第二行作为描述摘要。脚本文件头部也支持内嵌元数据（`:: title:` / `' title:` 风格），优先级高于 readme。
 
 ---
 
@@ -117,7 +129,7 @@ ScriptDeck 启动中...
 |------|------|
 | `scan_root` | 扫描根目录，改成你自己放脚本的目录 |
 | `exclude_dirs` | 跳过这些文件夹 |
-| `exclude_bats` | 跳过这些 bat 文件（支持 `*` `?` 通配符） |
+| `exclude_bats` | 跳过这些脚本文件（支持 `*` `?` 通配符，对 `.bat` / `.vbs` 均生效） |
 | `exclude_scripts` | 按完整路径跳过特定脚本 |
 | `host` | 默认 `127.0.0.1`，想局域网访问改成 `0.0.0.0` |
 | `port` | 默认 `5000` |
@@ -148,9 +160,9 @@ ScriptDeck 启动中...
 |------|------|------|
 | `/api/scan` | GET | 重新扫描目录 |
 | `/api/set-root` | POST | 修改扫描根目录 |
-| `/api/exclude-bats` | GET/POST | 查询或更新 bat 排除规则 |
+| `/api/exclude-bats` | GET/POST | 查询或更新脚本排除规则 |
 | `/api/exclude-script` | POST | 添加/移除脚本排除 |
-| `/api/run-bat` | POST | 运行指定 bat 脚本 |
+| `/api/run-bat` | POST | 运行脚本（.bat 在新 cmd 窗口 / .vbs 通过 wscript.exe） |
 | `/api/open-folder` | POST | 在资源管理器中打开文件夹 |
 
 ---
@@ -164,7 +176,7 @@ ScriptDeck 启动中...
 | 图标 | Lucide Icons（CDN） |
 | Markdown | Marked.js（CDN） |
 | 设计 | CSS 自定义属性 + Glassmorphism |
-| 运行环境 | 仅 Windows（依赖 .bat / cmd） |
+| 运行环境 | 仅 Windows（依赖 .bat / .vbs / cmd） |
 
 ---
 
@@ -186,7 +198,7 @@ A：把文件夹名加到 `config.json` 的 `exclude_dirs` 里，重启。
 A：当前根据脚本名关键词自动匹配 Lucide 图标。改 `static/js/app.js` 里的 `iconFor()` 函数就行。
 
 **Q：为什么我的脚本没出现在页面上？**
-A：检查两点：① 文件夹下是否同时有 `.bat` 和 `readme.md` ② 文件夹是否在 `scan_root` 下且没被 `exclude_dirs` 排除。
+A：检查两点：① 文件夹下是否同时有脚本文件（`.bat` 或 `.vbs`）和 `readme.md` ② 文件夹是否在 `scan_root` 下且没被 `exclude_dirs` 排除。
 
 ---
 
@@ -194,9 +206,11 @@ A：检查两点：① 文件夹下是否同时有 `.bat` 和 `readme.md` ② �
 
 ```
 ScriptDeck/
-├── main.py                 # Flask 后端
+├── main.py                 # Flask 后端（含 bat/vbs 元数据解析）
+├── inject_bat_meta.py      # 批量注入 bat 元数据工具
 ├── config.json             # 运行时配置
-├── requirements.txt        # 依赖
+├── requirements.txt        # 依赖（仅 Flask）
+├── CLAUDE.md              # Claude Code 项目指南
 ├── AGENTS.md              # AI 项目上下文
 ├── README.md              # 你正在看的这份文档
 ├── templates/
@@ -206,9 +220,10 @@ ScriptDeck/
     ├── screenshots/
     │   └── index.png      # 界面截图
     ├── css/
-    │   └── app.css        # 样式表
+    │   └── app.css        # 样式表（含 .badge.vbs）
     └── js/
-        └── app.js         # 前端逻辑
+        ├── vendor/        # 本地依赖（Lucide、Marked）
+        └── app.js         # 前端逻辑（scripts + type 字段）
 ```
 
 ---

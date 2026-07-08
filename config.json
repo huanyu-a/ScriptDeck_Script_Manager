@@ -15,6 +15,7 @@
     "ceshi",
     "config",
     "neirong",
+    "scripts",
     "wwwroot"
   ],
   "exclude_bats": [

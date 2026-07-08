@@ -877,6 +877,11 @@ kbd {
   color: var(--green);
 }
 
+.badge.vbs {
+  background: rgba(9, 132, 227, .12);
+  color: var(--accent-2);
+}
+
 .favorite-button {
   display: grid;
   place-items: center;
