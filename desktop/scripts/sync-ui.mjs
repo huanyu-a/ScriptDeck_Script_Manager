@@ -22,7 +22,8 @@ if (!existsSync(srcHtml) || !existsSync(srcStatic)) {
 mkdirSync(destDir, { recursive: true });
 
 // ── 1. index.html：去 Jinja、修正相对路径 ──
-let html = readFileSync(srcHtml, "utf-8");
+// 统一为 LF 再匹配，避免 Windows runner 检出 CRLF 导致多行片段匹配失败
+let html = readFileSync(srcHtml, "utf-8").replace(/\r\n/g, "\n");
 const htmlReplacements = [
   [`{{ url_for('static', filename='css/app.css') }}`, "static/css/app.css"],
   [`{{ url_for('static', filename='js/vendor/lucide.min.js') }}`, "static/js/vendor/lucide.min.js"],
@@ -45,7 +46,7 @@ cpSync(srcStatic, destStatic, { recursive: true });
 
 // ── 3. app.js：fetch → Tauri invoke ──
 const appJsPath = join(destStatic, "js", "app.js");
-let js = readFileSync(appJsPath, "utf-8");
+let js = readFileSync(appJsPath, "utf-8").replace(/\r\n/g, "\n");
 
 const jsReplacements = [
   // 头部注入 invoke 桥接
