@@ -19,9 +19,7 @@ jobs:
           - os: windows-latest
             label: windows-x64
           - os: macos-latest
-            label: macos-arm64
-          - os: macos-13
-            label: macos-x64
+            label: macos-universal
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -34,8 +32,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: 安装 Rust
+      - name: 安装 Rust（macOS 附带 universal 双架构 target）
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
       - name: Rust 缓存
         uses: swatinem/rust-cache@v2
@@ -48,8 +48,13 @@ jobs:
       - name: 安装前端依赖
         run: npm install --no-fund --no-audit
 
-      - name: 构建（Windows 出 NSIS/MSI，macOS 出 App/Dmg）
-        run: npm run tauri build
+      - name: 构建（Windows 出 NSIS/MSI，macOS 出 universal App/Dmg）
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            npm run tauri build -- --target universal-apple-darwin
+          else
+            npm run tauri build
+          fi
 
       - name: 上传安装包
         uses: actions/upload-artifact@v4
@@ -59,5 +64,6 @@ jobs:
             desktop/src-tauri/target/release/bundle/**/*.exe
             desktop/src-tauri/target/release/bundle/**/*.msi
             desktop/src-tauri/target/release/bundle/**/*.dmg
-            desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
+            desktop/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+            desktop/src-tauri/target/universal-apple-darwin/release/bundle/**/*.app.tar.gz
           if-no-files-found: error
