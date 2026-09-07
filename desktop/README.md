@@ -34,15 +34,23 @@ npm run dev       # 开发调试窗口
 > `ui/` 由 `scripts/sync-ui.mjs` 生成（去 Jinja、fetch→invoke、追加 .sh 徽章），
 > 不要手改——修改根目录源文件后重新执行 `sync-ui` 即可。
 
+## 版本与发版
+
+版本号**单一来源**是仓库根目录的 `VERSION` 文件，`npm run sync-version` 将其同步到
+`tauri.conf.json` / `package.json` / `Cargo.toml`。
+
+发版流程：修改 `VERSION`（如 `1.1.0`）→ 提交并推送到 master → CI 自动打包并发布
+同名 GitHub Release（附全平台安装包）。**只有 VERSION 变更（或 Actions 页手动触发）才会打包**，
+普通代码推送不触发。
+
 ## 打包
 
 ```bash
 npm run build     # Windows 出 NSIS/MSI；macOS 出 .app/.dmg
 ```
 
-macOS 构建必须在 mac 上执行（Tauri 不支持交叉编译），或直接跑
-`.github/workflows/desktop-build.yml`（push 到 master 或手动触发，
-产物在 Actions Artifacts 中，覆盖 Windows x64 / macOS arm64 / macOS x64）。
+CI（`.github/workflows/desktop-build.yml`）覆盖 Windows x64 与 macOS universal（Intel + Apple Silicon
+双架构单包，无需 Intel runner）；macOS 构建无法在 Windows 上本地执行。
 
 ## 目录结构
 

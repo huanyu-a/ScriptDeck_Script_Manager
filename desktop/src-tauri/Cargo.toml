@@ -1,6 +1,6 @@
 [package]
 name = "scriptdeck"
-version = "1.0.0"
+version = "1.1.0"
 description = "ScriptDeck 脚本中台桌面版"
 edition = "2021"
 

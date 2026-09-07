@@ -14,6 +14,9 @@
 浏览器界面原样复用，后端用 Rust 重写，打包为独立安装包（Windows NSIS/MSI、macOS .dmg），
 macOS 上额外支持 `.sh` 脚本（在 Terminal 中运行）。详见 [desktop/README.md](desktop/README.md)。
 
+发版：修改根目录 [VERSION](VERSION) 并推送，CI 自动打包并发布带安装包的 GitHub Release；
+仅版本号变更（或手动触发）才打包。
+
 ```bash
 cd desktop
 npm install && npm run dev    # 开发调试

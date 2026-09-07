@@ -1,14 +1,15 @@
 name: Desktop Build
 
+# 仅当版本号变更（VERSION 文件修改的 push）或手动触发时打包；
+# 打包完成后自动发布/更新同名 GitHub Release 并附上安装包。
 on:
   workflow_dispatch:
   push:
     branches: [master]
-    paths:
-      - "desktop/**"
-      - "templates/**"
-      - "static/**"
-      - ".github/workflows/desktop-build.yml"
+    paths: ["VERSION"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,6 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 读取版本号
+        id: version
+        shell: bash
+        run: echo "ver=$(tr -d ' \r\n' < ../VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: 安装 Node
         uses: actions/setup-node@v4
         with:
@@ -41,6 +47,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: desktop/src-tauri
+
+      - name: 同步版本号（VERSION → tauri.conf/package.json/Cargo.toml）
+        run: node scripts/sync-version.mjs
 
       - name: 同步 UI（从 templates/ + static/ 生成）
         run: node scripts/sync-ui.mjs
@@ -57,10 +66,10 @@ jobs:
             npm run tauri build
           fi
 
-      - name: 上传安装包
+      - name: 上传 Artifacts（90 天）
         uses: actions/upload-artifact@v4
         with:
-          name: ScriptDeck-${{ matrix.label }}
+          name: ScriptDeck-${{ matrix.label }}-${{ steps.version.outputs.ver }}
           path: |
             desktop/src-tauri/target/release/bundle/**/*.exe
             desktop/src-tauri/target/release/bundle/**/*.msi
@@ -68,3 +77,14 @@ jobs:
             desktop/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
             desktop/src-tauri/target/universal-apple-darwin/release/bundle/**/*.app.tar.gz
           if-no-files-found: error
+
+      - name: 发布/更新 GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.version.outputs.ver }}"
+          FILES=$(find src-tauri/target -path "*bundle*" \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.app.tar.gz" \) | sort -u | tr '\n' ' ')
+          echo " attaching: $FILES"
+          gh release create "$TAG" --title "ScriptDeck $TAG" --generate-notes $FILES \
+            || gh release upload "$TAG" $FILES --clobber
