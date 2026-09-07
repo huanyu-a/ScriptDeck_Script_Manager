@@ -1,3 +1,5 @@
+const { invoke } = window.__TAURI__.core;
+
 const storageKeys = {
   theme: "psm.theme",
   favorites: "psm.favorites",
@@ -251,8 +253,7 @@ function bindEvents() {
 async function loadData() {
   renderLoading();
   try {
-    const response = await fetch("/api/scan");
-    const payload = await response.json();
+    const payload = await invoke("scan");
     appState.items = payload.items || [];
     appState.scanRoot = payload.scan_root || "-";
     appState.excludeScripts = payload.exclude_scripts || [];
@@ -280,12 +281,7 @@ async function setScanRoot() {
   elements.setRootBtn.disabled = true;
   elements.setRootBtn.textContent = "应用中…";
   try {
-    const response = await fetch("/api/set-root", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scan_root: scanRoot }),
-    });
-    const payload = await response.json();
+    const payload = await invoke("set_root", { scanRoot });
     if (!payload.ok) {
       toast(payload.msg || "设置失败", "err");
       return;
@@ -313,8 +309,7 @@ async function setScanRoot() {
 
 async function loadExcludeBats() {
   try {
-    const res = await fetch("/api/exclude-bats");
-    const data = await res.json();
+    const data = await invoke("get_exclude_bats");
     appState.excludeBats = data.exclude_bats || [];
     renderExcludeBatsList();
   } catch { appState.excludeBats = []; }
@@ -350,12 +345,7 @@ async function removeExcludeBatPattern(pattern) {
 
 async function saveExcludeBats(patterns) {
   try {
-    const res = await fetch("/api/exclude-bats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exclude_bats: patterns }),
-    });
-    const data = await res.json();
+    const data = await invoke("set_exclude_bats", { excludeBats: patterns });
     if (data.ok) {
       appState.excludeBats = data.exclude_bats || [];
       appState.items = data.items || [];
@@ -423,12 +413,7 @@ async function toggleExcludeScript(script) {
   const action = isExcluded ? "remove" : "add";
 
   try {
-    const res = await fetch("/api/exclude-script", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: script.path, action }),
-    });
-    const data = await res.json();
+    const data = await invoke("exclude_script", { path: script.path, action });
     if (data.ok) {
       appState.excludeScripts = data.exclude_scripts || [];
       appState.items = data.items || [];
@@ -449,12 +434,7 @@ async function runScriptById(scriptId) {
   if (!script) return;
 
   try {
-    const response = await fetch("/api/run-bat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: script.path }),
-    });
-    const payload = await response.json();
+    const payload = await invoke("run_script", { path: script.path });
     if (!payload.ok) {
       toast(payload.msg || "启动失败", "err");
       return;
@@ -471,11 +451,7 @@ async function runScriptById(scriptId) {
 
 async function openFolder(folderPath) {
   try {
-    await fetch("/api/open-folder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: folderPath }),
-    });
+    await invoke("open_folder", { path: folderPath });
   } catch (error) {
     toast(`打开目录失败：${error.message}`, "err");
   }
@@ -489,7 +465,7 @@ function flattenScripts(items) {
     return (item.scripts || []).map((scriptFile) => {
       const batMeta = scriptFile.meta || {};
       // 优先级：脚本内嵌标题 > readme 标题 > 文件名（去掉 .bat / .vbs 后缀）
-      const title = batMeta.title || readmeTitle || scriptFile.name.replace(/\.(bat|vbs)$/i, "");
+      const title = batMeta.title || readmeTitle || scriptFile.name.replace(/\.(bat|vbs|sh)$/i, "");
       // 优先级：脚本内嵌描述 > readme 摘要
       const summary = batMeta.desc || readmeSummary;
       return {
@@ -611,7 +587,7 @@ function renderScriptCard(script) {
       <p class="script-desc">${escapeHtml(script.readmeSummary || "暂无 README 摘要。选中后可查看路径与快捷操作。")}</p>
       <div class="script-actions">
         <div class="badge-row">
-          <span class="badge ${script.type === "vbs" ? "vbs" : ""}">${script.type === "vbs" ? "VBS" : "BAT"}</span>
+          <span class="badge ${script.type === "bat" ? "" : script.type}">${script.type.toUpperCase()}</span>
           ${script.readmeText ? `<span class="badge readme">README</span>` : ""}
         </div>
         <div class="script-actions">

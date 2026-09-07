@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "ScriptDeck 主窗口默认能力（所有业务逻辑走自定义 Rust 命令）",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

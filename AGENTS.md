@@ -6,16 +6,27 @@
 
 并非局限于 Python 脚本——任何能通过 `.bat` / `.vbs` 启动的项目都能接入。
 
+## 桌面版（desktop/）
+
+仓库同时包含 Tauri 2 + Rust 桌面版（`desktop/`），与 Python/Flask 版共存：
+
+- **后端**：`desktop/src-tauri/src/` 下 `config.rs` / `scanner.rs` / `runner.rs` / `main.rs`，是 `main.py` 逻辑的 1:1 移植，命令返回与 Flask 端点**同构的 JSON**
+- **前端**：`desktop/ui/` 由 `desktop/scripts/sync-ui.mjs` 从根目录 `templates/` + `static/` 生成（去 Jinja、fetch→`window.__TAURI__.core.invoke`），**不要手改 `ui/`**，改根目录源文件后跑 `npm run sync-ui`
+- **脚本类型**：三端统一扫描 `.bat`/`.vbs`/`.sh`（`# title:` 元数据）；`.sh` 运行 Windows 走 Git Bash 新控制台窗口、macOS 走 Terminal.app
+- **配置**：存系统应用数据目录（`%APPDATA%\com.scriptdeck.app\config.json`），首次启动自动从旧版根目录 `config.json` 迁移
+- 开发 `npm run dev`，打包 `npm run build`；macOS 构建需在 mac 上（或走 `.github/workflows/desktop-build.yml`），详见 `desktop/README.md`
+- 一致性回归：`cd desktop/src-tauri && SCAN_ROOT="D:\project" cargo test -- --nocapture` 可与 `main.py` 的扫描输出做逐行对比
+
 ## 脚本接入规范
 
 ScriptDeck 扫描目录时**只收集同时满足以下两点的子目录**：
 
-1. 目录下至少有一个 `.bat` 或 `.vbs` 文件
+1. 目录下至少有一个 `.bat` / `.vbs` / `.sh` 文件
 2. 目录下存在 `readme.md` 文件
 
-**VBS 优先规则**：当同一目录同时存在 `.vbs` 和 `.bat` 时，只提取 `.vbs` 文件。
+**脚本优先规则**：当同一目录同时存在多种脚本时，只保留优先级最高的一类：vbs > bat > sh（历史迁移顺序）。
 
-`.bat` 文件建议使用绝对路径（含 Python 解释器路径），避免依赖系统环境变量。`.vbs` 文件使用 `WScript.Shell` 启动目标程序。`readme.md` 第一行作为脚本标题、第二行作为简要描述。
+`.bat` 文件建议使用绝对路径（含 Python 解释器路径），避免依赖系统环境变量。`.vbs` 文件使用 `WScript.Shell` 启动目标程序。`.sh` 文件 Windows 上经 Git Bash 在新控制台窗口运行（脚本结束后保留交互 bash），macOS 上在 Terminal.app 中运行。`readme.md` 第一行作为脚本标题、第二行作为简要描述。
 
 ### 内嵌元数据（可选）
 
@@ -23,6 +34,11 @@ ScriptDeck 扫描目录时**只收集同时满足以下两点的子目录**：
 
 - `.bat`：`@echo off` 之后用 `:: title:` / `:: desc:`（或 `REM` 风格）注释
 - `.vbs`：用 `' title:` / `' desc:` 单引号注释（VBS 标准注释风格）
+- `.sh`：用 `# title:` / `# desc:` 注释
+
+### bat → sh 批量改造
+
+`convert_bat_to_sh.py` 将扫描根下全部 `.bat` 一次性转换为 `.sh`（简单脚本规则翻译、复杂脚本内嵌手写移植、元数据同步转换、LF 行尾），原 `.bat` 移入 `<扫描根>/.bat-sh-backup/` 备份（`.` 开头目录不会被扫描）。已于 2026-09-07 执行完毕，扫描根内现仅存 `.sh`（1 个 `.vbs`）。
 
 ## 快速启动
 
@@ -53,7 +69,7 @@ python main.py
 - `scan_directory()` — 递归扫描 `scan_root`，收集每子目录下的 `.bat` / `.vbs` 和 `readme.md`；同目录同时存在时只保留 `.vbs`（VBS 优先）
 - `parse_bat_metadata()` — 解析 `.bat` 头部的 `:: title:` / `:: desc:` 元数据
 - `parse_vbs_metadata()` — 解析 `.vbs` 头部的 `' title:` / `' desc:` 元数据
-- 执行脚本：`.bat` 用 `subprocess.Popen` + `cmd /k chcp 65001` 确保 UTF-8 不乱码；`.vbs` 用 `wscript.exe` 执行
+- 执行脚本：`.bat` 用 `subprocess.Popen` + `cmd /k chcp 65001` 确保 UTF-8 不乱码；`.vbs` 用 `wscript.exe` 执行；`.sh` 用 Git Bash 在新控制台窗口执行（`CREATE_NEW_CONSOLE` + `exec bash --login` 保持窗口）
 
 API 路由：
 | 路由 | 方法 | 说明 |
@@ -63,7 +79,7 @@ API 路由：
 | `/api/set-root` | POST | 修改扫描根目录 |
 | `/api/exclude-bats` | GET/POST | 查询/更新脚本文件名排除规则 |
 | `/api/exclude-script` | POST | 添加/移除脚本排除 |
-| `/api/run-bat` | POST | 执行脚本（.bat 在新 cmd 窗口 / .vbs 通过 wscript.exe） |
+| `/api/run-bat` | POST | 执行脚本（.bat 新 cmd 窗口 / .vbs 用 wscript.exe / .sh 用 Git Bash 新窗口） |
 | `/api/open-folder` | POST | 在资源管理器中打开文件夹 |
 
 ### 前端
@@ -110,7 +126,8 @@ API 路由：
 
 ## 平台限制
 
-- **仅 Windows**：依赖 `.bat`、`.vbs`（`wscript.exe`）、`cmd`、`explorer.exe`
+- **旧 Flask 版仅 Windows**：依赖 `.bat`、`.vbs`（`wscript.exe`）、`cmd`、`explorer.exe`；`.sh` 需 Git Bash
+- **桌面版**：Windows + macOS；macOS 上 `.bat`/`.vbs` 无法运行，请使用 `.sh`
 - 路径使用反斜杠，经 `os.path.normpath` 标准化
 
 ## 开发笔记

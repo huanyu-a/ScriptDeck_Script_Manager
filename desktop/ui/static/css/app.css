@@ -1723,3 +1723,7 @@ kbd {
     display: none;
   }
 }
+.badge.sh {
+  background: rgba(243, 156, 18, .12);
+  color: var(--f-warning, #f39c12);
+}

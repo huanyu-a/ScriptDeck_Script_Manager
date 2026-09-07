@@ -140,30 +140,36 @@ def parse_bat_metadata(bat_path: str) -> dict:
 
 def parse_vbs_metadata(vbs_path: str) -> dict:
     """
-    解析 vbs 文件头部的内嵌元数据。
-
-    支持的元数据格式（VBS 使用单引号注释）：
-      ' title: 脚本标题
-      ' desc: 脚本描述
-
-    规则：
-      - 从第一行开始匹配连续的注释行（以 ' 开头）
-      - 遇到非注释行就停止
-      - 返回 {"title": "...", "desc": "..."}，未匹配到则返回空字符串
+    解析 vbs 文件头部的内嵌元数据（单引号注释块）。
     """
+    return _parse_comment_metadata(vbs_path, "'")
+
+
+def parse_sh_metadata(sh_path: str) -> dict:
+    """
+    解析 sh 文件头部的内嵌元数据（# 注释块）：
+
+      # title: 脚本标题
+      # desc: 脚本描述
+
+    规则与 vbs 相同：从第一行开始连续的 # 注释行，遇非注释行停止。
+    """
+    return _parse_comment_metadata(sh_path, "#")
+
+
+def _parse_comment_metadata(path: str, prefix: str) -> dict:
     meta = {"title": "", "desc": ""}
-    lines, _ = _read_file_with_encoding(vbs_path, max_lines=10)
+    lines, _ = _read_file_with_encoding(path, max_lines=10)
 
     if not lines:
         return meta
 
-    # 从第一行开始解析连续的注释块
     for line in lines:
         stripped = line.strip()
-        if not stripped.startswith("'"):
+        if not stripped.startswith(prefix):
             break  # 遇到非注释行，停止解析
 
-        content = stripped[1:].strip()  # 去掉 ' 前缀
+        content = stripped[len(prefix):].strip()
         if ":" in content:
             key, _, value = content.partition(":")
             key = key.strip().lower()
@@ -178,9 +184,9 @@ def parse_vbs_metadata(vbs_path: str) -> dict:
 
 def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None, exclude_scripts: list = None):
     """
-    扫描 scan_root 下的子文件夹，收集 .bat / .vbs 文件和 readme 文件。
+    scans scan_root 下的子文件夹，收集 .bat / .vbs / .sh 文件和 readme 文件。
     exclude_scripts: 按完整路径排除的脚本列表。
-    当同一目录同时存在 .vbs 和 .bat 时，只保留 .vbs（VBS 优先）。
+    脚本优先级：同目录同时存在多种脚本时，vbs > bat > sh（历史迁移顺序）。
     返回按文件夹分组的数据结构：
     [
       {
@@ -210,6 +216,7 @@ def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None
 
         bats = []
         vbs_scripts = []
+        sh_scripts = []
         readme = None
 
         for fname in filenames:
@@ -229,6 +236,13 @@ def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None
                 if not bat_excluded(fname, exclude_bats or []):
                     meta = parse_vbs_metadata(full)
                     vbs_scripts.append({"name": fname, "path": full, "meta": meta, "type": "vbs"})
+            elif lower_name.endswith(".sh"):
+                norm_full = os.path.normpath(full).lower()
+                if norm_full in exclude_script_set:
+                    continue
+                if not bat_excluded(fname, exclude_bats or []):
+                    meta = parse_sh_metadata(full)
+                    sh_scripts.append({"name": fname, "path": full, "meta": meta, "type": "sh"})
             elif is_readme(fname):
                 try:
                     # 尝试多种编码读取 readme，避免中文乱码
@@ -247,8 +261,8 @@ def scan_directory(scan_root: str, exclude_dirs: list, exclude_bats: list = None
                     content = "(无法读取)"
                 readme = {"name": fname, "path": full, "content": content}
 
-        # VBS 优先：同目录同时存在 .vbs 和 .bat 时，只保留 .vbs
-        scripts = vbs_scripts if vbs_scripts else bats
+        # 脚本优先级：vbs > bat > sh（历史迁移顺序，兼容存量 vbs/bat 项目）
+        scripts = vbs_scripts if vbs_scripts else (bats if bats else sh_scripts)
 
         if scripts or readme:
             parts = Path(rel).parts
@@ -335,9 +349,35 @@ def api_exclude_script():
     data = scan_directory(CFG["scan_root"], CFG.get("exclude_dirs", []), CFG.get("exclude_bats", []), CFG.get("exclude_scripts", []))
     return jsonify({"ok": True, "exclude_scripts": CFG["exclude_scripts"], "items": data, "total": len(data)})
 
+# ─── sh 执行辅助（Windows 依赖 Git Bash）──────────────────────────────────────
+
+def _find_git_bash():
+    """定位 Git Bash（跳过 WSL 的 System32\\bash.exe，路径语义不同）。"""
+    candidates = []
+    for var in ("ProgramFiles", "ProgramFiles(x86)"):
+        base = os.environ.get(var)
+        if base:
+            candidates.append(os.path.join(base, "Git", "bin", "bash.exe"))
+    local = os.environ.get("LocalAppData")
+    if local:
+        candidates.append(os.path.join(local, "Programs", "Git", "bin", "bash.exe"))
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
+def _to_unix_path(path: str) -> str:
+    """Windows 路径转 Git Bash 风格：D:\\a b\\x.sh → /d/a b/x.sh"""
+    path = path.replace("/", "\\")
+    if len(path) >= 2 and path[1] == ":":
+        return "/" + path[0].lower() + path[2:].replace("\\", "/")
+    return path.replace("\\", "/")
+
+
 @app.route("/api/run-bat", methods=["POST"])
 def api_run_bat():
-    """运行脚本文件（.bat 或 .vbs）"""
+    """运行脚本文件（.bat / .vbs / .sh）"""
     body = request.json or {}
     script_path = body.get("path", "").strip()
     if not script_path or not os.path.isfile(script_path):
@@ -348,6 +388,16 @@ def api_run_bat():
         if script_path.lower().endswith(".vbs"):
             # VBS 通过 wscript.exe 执行，脚本自身控制窗口（如隐藏 GUI）
             subprocess.Popen(f'wscript.exe "{script_path}"', shell=True, cwd=script_dir)
+        elif script_path.lower().endswith(".sh"):
+            # sh 通过 Git Bash 在新控制台窗口执行，脚本结束后保留交互 bash（对齐 cmd /k 行为）
+            bash = _find_git_bash()
+            if not bash:
+                return jsonify({"ok": False, "msg": "未找到 Git Bash，请安装 Git for Windows"}), 400
+            unix_path = _to_unix_path(script_path).replace("'", "'\\''")
+            subprocess.Popen(
+                f'"{bash}" --login -i -c "bash \'{unix_path}\'; exec bash --login"',
+                shell=True, cwd=script_dir, creationflags=subprocess.CREATE_NEW_CONSOLE
+            )
         else:
             # chcp 65001 将 cmd 切换到 UTF-8 编码，避免 bat 中的中文路径乱码
             subprocess.Popen(

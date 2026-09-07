@@ -1,6 +1,6 @@
 # ScriptDeck（脚本中台）
 
-> 给你的 Python 脚本一个家 —— 自动扫描目录中的 `.bat` / `.vbs` 和 README 文档，在漂亮的浏览器界面中一键查找、预览、启动。不只 Python，任何能用 .bat / .vbs 跑起来的项目都行。
+> 给你的 Python 脚本一个家 —— 自动扫描目录中的 `.bat` / `.vbs` / `.sh` 和 README 文档，在漂亮的浏览器界面中一键查找、预览、启动。不只 Python，任何能跑起来的项目都行。
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
@@ -8,13 +8,27 @@
 
 ---
 
+## 🖥️ 桌面版（Windows / macOS）
+
+项目同时提供基于 **Tauri 2 + Rust** 的桌面应用，位于 [`desktop/`](desktop/)：
+浏览器界面原样复用，后端用 Rust 重写，打包为独立安装包（Windows NSIS/MSI、macOS .dmg），
+macOS 上额外支持 `.sh` 脚本（在 Terminal 中运行）。详见 [desktop/README.md](desktop/README.md)。
+
+```bash
+cd desktop
+npm install && npm run dev    # 开发调试
+npm run build                 # 打包安装程序
+```
+
+---
+
 ## 💡 工作原理
 
-ScriptDeck 不关心你的脚本是什么语言。它只看一件事：**你指定的目录下，哪些子目录同时有脚本文件（`.bat` 或 `.vbs`）和 `readme.md` 文件。**
+ScriptDeck 不关心你的脚本是什么语言。它只看一件事：**你指定的目录下，哪些子目录同时有脚本文件（`.bat` / `.vbs` / `.sh`）和 `readme.md` 文件。**
 
 找到后，自动整理成卡片界面 —— 脚本文件负责启动，readme 负责说明。点一下"运行"，脚本就在新窗口中跑起来了。
 
-> 💡 **VBS 优先**：当同一目录同时存在 `.vbs` 和 `.bat` 时，只提取 `.vbs` 文件。
+> 💡 **脚本优先级**：同一目录同时存在多种脚本时，只提取优先级最高的一类：vbs > bat > sh（历史迁移顺序）。
 
 ### 接入一个新脚本，只需三步
 
@@ -162,7 +176,7 @@ ScriptDeck 启动中...
 | `/api/set-root` | POST | 修改扫描根目录 |
 | `/api/exclude-bats` | GET/POST | 查询或更新脚本排除规则 |
 | `/api/exclude-script` | POST | 添加/移除脚本排除 |
-| `/api/run-bat` | POST | 运行脚本（.bat 在新 cmd 窗口 / .vbs 通过 wscript.exe） |
+| `/api/run-bat` | POST | 运行脚本（.bat 新 cmd 窗口 / .vbs 用 wscript.exe / .sh 用 Git Bash 新窗口） |
 | `/api/open-folder` | POST | 在资源管理器中打开文件夹 |
 
 ---
@@ -176,7 +190,7 @@ ScriptDeck 启动中...
 | 图标 | Lucide Icons（CDN） |
 | Markdown | Marked.js（CDN） |
 | 设计 | CSS 自定义属性 + Glassmorphism |
-| 运行环境 | 仅 Windows（依赖 .bat / .vbs / cmd） |
+| 运行环境 | 仅 Windows（依赖 .bat / .vbs / cmd / Git Bash）；桌面版另支持 macOS |
 
 ---
 

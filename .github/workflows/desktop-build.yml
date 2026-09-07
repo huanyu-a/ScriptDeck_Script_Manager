@@ -1,0 +1,63 @@
+name: Desktop Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "desktop/**"
+      - "templates/**"
+      - "static/**"
+      - ".github/workflows/desktop-build.yml"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+          - os: macos-latest
+            label: macos-arm64
+          - os: macos-13
+            label: macos-x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 缓存
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: 同步 UI（从 templates/ + static/ 生成）
+        run: node scripts/sync-ui.mjs
+
+      - name: 安装前端依赖
+        run: npm install --no-fund --no-audit
+
+      - name: 构建（Windows 出 NSIS/MSI，macOS 出 App/Dmg）
+        run: npm run tauri build
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScriptDeck-${{ matrix.label }}
+          path: |
+            desktop/src-tauri/target/release/bundle/**/*.exe
+            desktop/src-tauri/target/release/bundle/**/*.msi
+            desktop/src-tauri/target/release/bundle/**/*.dmg
+            desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
+          if-no-files-found: error

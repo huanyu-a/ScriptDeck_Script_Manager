@@ -1,5 +1,5 @@
 {
-  "scan_root": "C:\\project",
+  "scan_root": "D:\\project",
   "exclude_dirs": [
     "node_modules",
     ".git",

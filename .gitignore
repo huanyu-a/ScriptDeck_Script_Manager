@@ -31,3 +31,9 @@ Thumbs.db
 temp/
 screenshots/
 !static/screenshots/
+
+# Node / Tauri
+node_modules/
+
+# 本地 agent 协作状态
+.zcode/

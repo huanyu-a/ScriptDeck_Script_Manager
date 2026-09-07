@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+; 移除 ScriptDeck 开机自启（双击此文件合并即可关闭自启）
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run]
+"ScriptDeck"=-
