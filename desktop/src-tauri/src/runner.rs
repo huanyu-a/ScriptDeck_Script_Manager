@@ -5,8 +5,11 @@
 //! - Linux：.sh 交给 sh 后台执行；文件夹用 xdg-open
 
 use serde_json::{json, Value};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
+
+#[cfg(windows)]
+use std::path::PathBuf;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -129,9 +132,19 @@ pub fn run_script(script_path: &str) -> Value {
                 }
             }
             _ => {
-                // chcp 65001 将 cmd 切换到 UTF-8 编码，避免 bat 中的中文路径乱码
-                let inner = format!("chcp 65001 >nul && \"{}\"", path.display());
-                spawn_in_new_console("cmd", &["/K", &inner], dir, &format!("Running: {}", basename))
+                #[cfg(windows)]
+                {
+                    // chcp 65001 将 cmd 切换到 UTF-8 编码，避免 bat 中的中文路径乱码
+                    let inner = format!("chcp 65001 >nul && \"{}\"", path.display());
+                    spawn_in_new_console(
+                        "cmd",
+                        &["/K", &inner],
+                        dir,
+                        &format!("Running: {}", basename),
+                    )
+                }
+                #[cfg(not(windows))]
+                Err("macOS/Linux 不支持运行 .bat/.vbs，请使用 .sh 脚本".to_string())
             }
         }
     } else if cfg!(target_os = "macos") {
