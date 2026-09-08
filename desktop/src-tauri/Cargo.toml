@@ -1,6 +1,6 @@
 [package]
 name = "scriptdeck"
-version = "1.1.0"
+version = "1.2.0"
 description = "ScriptDeck 脚本中台桌面版"
 edition = "2021"
 
@@ -8,7 +8,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2"

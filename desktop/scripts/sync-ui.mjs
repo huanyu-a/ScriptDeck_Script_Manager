@@ -30,7 +30,6 @@ const htmlReplacements = [
   [`{{ url_for('static', filename='js/vendor/marked.min.js') }}`, "static/js/vendor/marked.min.js"],
   [`{{ url_for('static', filename='js/app.js') }}`, "static/js/app.js"],
   ["../static/logo.png", "static/logo.png"],
-  ["自动扫描 bat / vbs 和 README", "自动扫描 bat / vbs / sh 和 README"],
 ];
 for (const [from, to] of htmlReplacements) {
   if (!html.includes(from)) {
@@ -115,15 +114,15 @@ const jsReplacements = [
     });`,
     `    await invoke("open_folder", { path: folderPath });`,
   ],
-  // .sh 标题后缀剥离
+  // .sh 标题后缀剥离（根目录源已支持 .sh，此条仅作存在性校验）
   [
-    `scriptFile.name.replace(/\\.(bat|vbs)$/i, "")`,
+    `scriptFile.name.replace(/\\.(bat|vbs|sh)$/i, "")`,
     `scriptFile.name.replace(/\\.(bat|vbs|sh)$/i, "")`,
   ],
-  // 徽章：BAT/VBS/SH 通用化
+  // 徽章：类型大写直出（根目录源已通用化，此条仅作存在性校验）
   [
-    `<span class="badge \${script.type === "vbs" ? "vbs" : ""}">\${script.type === "vbs" ? "VBS" : "BAT"}</span>`,
-    `<span class="badge \${script.type === "bat" ? "" : script.type}">\${script.type.toUpperCase()}</span>`,
+    `<span class="badge \${escapeAttr(script.type)}">\${escapeHtml(script.type.toUpperCase())}</span>`,
+    `<span class="badge \${escapeAttr(script.type)}">\${escapeHtml(script.type.toUpperCase())}</span>`,
   ],
 ];
 

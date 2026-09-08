@@ -1,7 +1,7 @@
 {
   "name": "scriptdeck-desktop",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ScriptDeck 桌面版（Tauri 2 + Rust）",
   "scripts": {
     "sync-ui": "node scripts/sync-ui.mjs",

@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "ScriptDeck 主窗口默认能力（所有业务逻辑走自定义 Rust 命令）",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
 }

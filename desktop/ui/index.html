@@ -13,24 +13,38 @@
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
-  <div class="app-shell">
-    <div class="workspace">
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <div class="brand">
-            <img src="static/logo.png" alt="ScriptDeck Logo" class="brand-logo">
-            <div>
-              <div class="brand-title">ScriptDeck</div>
-              <div class="brand-subtitle">脚本中台</div>
-            </div>
+  <div class="app-shell" id="appShell">
+    <header class="topbar" id="topbar">
+      <div class="topbar-inner">
+        <div class="traffic-lights" data-tauri-drag-region>
+          <button class="tl tl-close" id="winCloseBtn" type="button" title="关闭窗口" aria-label="关闭窗口"></button>
+          <button class="tl tl-min" id="winMinBtn" type="button" title="最小化" aria-label="最小化"></button>
+          <button class="tl tl-max" id="winMaxBtn" type="button" title="最大化 / 还原" aria-label="最大化"></button>
+        </div>
+        <div class="brand" data-tauri-drag-region>
+          <img src="static/logo.png" alt="ScriptDeck Logo" class="brand-logo">
+          <div>
+            <div class="brand-title">ScriptDeck</div>
+            <div class="brand-subtitle">脚本中台</div>
           </div>
-
-          <label class="command-search" for="searchInput">
-            <span class="search-icon">⌘</span>
-            <input id="searchInput" type="search" placeholder="搜索脚本…">
-          </label>
         </div>
 
+        <label class="command-search" for="searchInput">
+          <span class="search-icon">⌘</span>
+          <input id="searchInput" type="search" placeholder="搜索脚本、目录或 README…">
+          <kbd>Ctrl K</kbd>
+        </label>
+
+        <div class="topbar-actions">
+          <button class="ghost-button ghost-icon" id="themeBtn" type="button" title="切换主题">☾</button>
+          <button class="ghost-button" id="refreshBtn" type="button" title="重新扫描">刷新</button>
+          <button class="primary-button" id="settingsBtn" type="button">设置目录</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar">
         <nav class="nav-tabs" aria-label="快捷筛选">
           <button class="nav-tab active" type="button" data-mode="all">
             全部<b id="countAll">0</b>
@@ -43,16 +57,26 @@
           </button>
         </nav>
 
+        <div class="metrics">
+          <div class="metric-item">
+            <strong id="metricDirs">0</strong>
+            <span>目录</span>
+          </div>
+          <div class="metric-item">
+            <strong id="metricScripts">0</strong>
+            <span>脚本</span>
+          </div>
+          <div class="metric-item">
+            <strong id="metricReadmes">0</strong>
+            <span>文档</span>
+          </div>
+        </div>
+
         <div class="sidebar-title">目录树</div>
         <div class="tree" id="sidebarTree"></div>
       </aside>
 
       <main class="content">
-        <section class="hero">
-          <h1>更快找到脚本，更舒服地启动任务</h1>
-          <p>自动扫描 bat / vbs / sh 和 README，支持收藏、最近运行、目录筛选与详情预览</p>
-        </section>
-
         <section class="content-toolbar">
           <div>
             <h2 id="viewTitle">全部脚本</h2>
@@ -74,31 +98,11 @@
       </main>
 
       <aside class="detail-panel" id="detailPanel" aria-label="脚本详情">
-        <div class="detail-actions-row">
-          <button class="ghost-button" id="themeBtn" type="button" title="切换主题">☾</button>
-          <button class="ghost-button" id="refreshBtn" type="button">刷新</button>
-          <button class="primary-button" id="settingsBtn" type="button">设置目录</button>
-        </div>
-        <div class="detail-metrics">
-          <div class="metric-item">
-            <span>目录</span>
-            <strong id="metricDirs">0</strong>
-          </div>
-          <div class="metric-item">
-            <span>脚本</span>
-            <strong id="metricScripts">0</strong>
-          </div>
-          <div class="metric-item">
-            <span>文档</span>
-            <strong id="metricReadmes">0</strong>
-          </div>
-        </div>
-
         <div class="detail-content">
           <div class="detail-empty">
             <div class="empty-orb">✦</div>
             <h3>选择一个脚本</h3>
-            <p>这里会展示路径、README 摘要和快捷操作。</p>
+            <p>这里会展示路径、README 和快捷操作。</p>
           </div>
         </div>
       </aside>
@@ -114,7 +118,7 @@
         </div>
         <button class="icon-button" id="closeSettingsBtn" type="button" aria-label="关闭">×</button>
       </div>
-      <p class="modal-copy">程序会扫描该目录下的子文件夹，收集 <b>.bat</b> / <b>.vbs</b> 与 README 文件。</p>
+      <p class="modal-copy">程序会扫描该目录下的子文件夹，收集 <b>.bat</b> / <b>.vbs</b> / <b>.sh</b> 与 README 文件。</p>
       <div class="path-input-row">
         <input id="rootInput" type="text" placeholder="例如：C:\project">
         <button class="primary-button" id="setRootBtn" type="button">应用</button>

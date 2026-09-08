@@ -27,7 +27,39 @@ const appState = {
 
 const elements = {};
 
+/* —— 平台检测：macOS 用系统 Overlay 红绿灯，Windows/Linux 自绘红绿灯并接管窗口控制，浏览器隐藏 —— */
+function applyPlatformMode() {
+  const isDesktop = typeof window !== "undefined" && !!window.__TAURI__;
+  if (!isDesktop) {
+    document.body.classList.add("web-mode");
+    return;
+  }
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isMac = /Mac|iPhone|iPad/i.test(ua) && !/Windows/i.test(ua);
+  document.body.classList.add(isMac ? "mac-mode" : "win-mode");
+  if (!isMac) bindWindowControls();
+}
+
+/* Windows/Linux 无原生标题栏，红绿灯直接调用 Tauri 窗口 API */
+function bindWindowControls() {
+  const tauriWindow = window.__TAURI__ && window.__TAURI__.window;
+  if (!tauriWindow || typeof tauriWindow.getCurrentWindow !== "function") return;
+  try {
+    const win = tauriWindow.getCurrentWindow();
+    const bind = (id, action) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener("click", () => action(win));
+    };
+    bind("winCloseBtn", (w) => w.close());
+    bind("winMinBtn", (w) => w.minimize());
+    bind("winMaxBtn", (w) => w.toggleMaximize());
+  } catch (err) {
+    console.warn("窗口红绿灯不可用：", err);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  applyPlatformMode();
   bindElements();
   bindEvents();
   applyInitialTheme();
@@ -587,7 +619,7 @@ function renderScriptCard(script) {
       <p class="script-desc">${escapeHtml(script.readmeSummary || "暂无 README 摘要。选中后可查看路径与快捷操作。")}</p>
       <div class="script-actions">
         <div class="badge-row">
-          <span class="badge ${script.type === "bat" ? "" : script.type}">${script.type.toUpperCase()}</span>
+          <span class="badge ${escapeAttr(script.type)}">${escapeHtml(script.type.toUpperCase())}</span>
           ${script.readmeText ? `<span class="badge readme">README</span>` : ""}
         </div>
         <div class="script-actions">
@@ -653,7 +685,7 @@ function renderDetail() {
         <div class="detail-list">
           ${siblingScripts.length ? siblingScripts.map((candidate) => `
             <button type="button" data-detail-run="${escapeAttr(candidate.id)}">${escapeHtml(candidate.name)}</button>
-          `).join("") : "<span>没有其它 bat 脚本。</span>"}
+          `).join("") : "<span>没有其它脚本。</span>"}
         </div>
       </section>
     </div>
